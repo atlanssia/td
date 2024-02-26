@@ -40,12 +40,16 @@ func main() {
 	// }
 
 	app := iris.New()
+
+	app.HandleDir("/", "static")
+
 	statusApi := app.Party("/status")
 	{
 		statusApi.Use(iris.Compression)
-
 		statusApi.Get("/", status)
 	}
+
+	app.Favicon("static/favicons/t_fav_32.ico")
 
 	err := app.Listen(":9990")
 	if err != nil {
