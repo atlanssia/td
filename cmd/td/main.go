@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -13,7 +16,7 @@ import (
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("panic: %v", string(debug.Stack()))
+			slog.Error("panic", "stack", string(debug.Stack()))
 		}
 
 		// release
@@ -25,7 +28,7 @@ func main() {
 	go func() {
 		sig := <-sc
 		slog.Warn("I will exit.", "signal", sig)
-		// TODO clean thins and exit
+		// TODO clean things and exit
 	}()
 
 	// conf, err := conf.Load()
@@ -39,9 +42,11 @@ func main() {
 	// 	log.Panicln(err)
 	// }
 
-	app := iris.New()
+	mux := http.NewServeMux()
 
-	app.HandleDir("/", "static")
+	mux.Handle("/", http.FileServer(http.Dir("static")))
+
+	mux.Handle("/status", status)
 
 	statusApi := app.Party("/status")
 	{
@@ -58,7 +63,7 @@ func main() {
 	}
 }
 
-func status(ctx iris.Context) {
+func status(w http.ResponseWriter, req *http.Request) {
 	data := &Status{
 		Status:      0,
 		Description: "",
@@ -72,8 +77,15 @@ func status(ctx iris.Context) {
 			System:         version.Status(),
 		},
 	}
-	_ = ctx.JSON(data)
-	ctx.StatusCode(iris.StatusOK)
+	j, err := json.Marshal(data)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(fmt.Sprintf(`{"message":"%s"}`, err)))
+		return
+	}
+
+	w.Write(j)
+	return
 }
 
 type Status struct {
